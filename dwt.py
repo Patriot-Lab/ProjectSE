@@ -1,5 +1,7 @@
 import numpy as np
 from numba import njit
+from utils import time_it
+
 
 @njit
 def dwt(seq):
@@ -20,6 +22,7 @@ def dwt(seq):
 
     return seq
 
+
 @njit
 def idwt(seq):
     seq = np.copy(seq)
@@ -39,7 +42,7 @@ def idwt(seq):
 
     return seq
 
-
+@time_it
 def dwt2d(seq):
     
     horizontal_transform = np.apply_along_axis(dwt, axis=1, arr=seq)
@@ -56,7 +59,7 @@ def dwt2d(seq):
     
     return ll, hl, lh, hh
 
-
+@time_it
 def idwt2d(ll, hl, lh, hh):
     
     l_rows = ll.shape[0] + lh.shape[0]

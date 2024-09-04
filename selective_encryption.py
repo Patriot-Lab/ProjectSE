@@ -1,15 +1,17 @@
 import os
 import numpy as np
 from dwt import dwt2d, idwt2d
-from utils import aes_encrypt, aes_decrypt, sha256_with_key, sha512_with_key, xor_with_sha_key
+from utils import aes_encrypt, aes_decrypt, sha256_with_key, sha512_with_key, xor_with_sha_key, time_it
 
-def se_encrypt(file_path, buffer,sha_key_str, aes_key):    
+@time_it
+def encrypt(file_path, buffer,sha_key_str, aes_key):    
     chunk_size = buffer * buffer
     sha_key = sha_key_str.encode()
     ll2_enc_key = aes_key
     d_private_fragment = []
     d_public_protected_fragment_1 = []
     d_public_protected_fragment_2 = []
+    itr_count = 0
         
     with open(file_path, 'rb') as file:
         while True:
@@ -19,38 +21,15 @@ def se_encrypt(file_path, buffer,sha_key_str, aes_key):
             if not chunk:
                 # print("Reached End of the file.\n")
                 break
+            print(f'itr_count: {itr_count}')
+            itr_count+=1
             
             if len(chunk) < chunk_size:
                 chunk += b'\x00' * (chunk_size - len(chunk))
             
-            byte_array = np.frombuffer(chunk, dtype=np.uint8)
-            byte_array_2d = np.reshape(byte_array, (buffer, buffer))
-            
-            #Step 1, 2D DWT LVL 1
-            ll, hl, lh, hh = dwt2d(byte_array_2d)
-    
-            #Step 2, 2D DWT LVL 2
-            ll2, hl2, lh2, hh2 = dwt2d(ll)
+            encrypted_ll2, PPF1_XOR, PPF2_XOR = _se_encrypt(chunk=chunk, buffer=buffer, sha_key=sha_key, ll2_enc_key=ll2_enc_key)
 
-            #Step 3, SHA-256 with key, on ll2, for PPF1
-            SHA256_PPF1 = sha256_with_key(sha_key, ll2.tobytes())
-            
-            #Step 4, SHA-512 with key, on (lh2, hl2, hh2), for PPF2
-            SHA512_PPF2 = sha512_with_key(sha_key, np.array([lh2,hl2,hh2]).tobytes())        
-            
-            #Step 5, PPF1 generation, XOR using generated SHA-256 from ll2
-            PPF1_bytes = np.array([hl2, lh2, hh2]).tobytes()
-            PPF1_XOR = xor_with_sha_key(PPF1_bytes, SHA256_PPF1)
-            
-            #Step 6, PPF2 generation, XOR using generated SHA-512 from (lh2, hl2, hh2)
-            PPF2_bytes = np.array([hl, lh, hh]).tobytes()
-            PPF2_XOR = xor_with_sha_key(PPF2_bytes, SHA512_PPF2)
-                        
-            
-            #Step 7, Encrypt LL2 (AES 256)
-            encrypted_ll2 = aes_encrypt(ll2.tobytes(), ll2_enc_key)
-
-            #Step 7, Append to Data Sequence
+            #Step 8, Append to Data Sequence
             d_private_fragment.append(np.frombuffer(encrypted_ll2, dtype=np.uint8))
             d_public_protected_fragment_1.append(np.frombuffer(PPF1_XOR, dtype=np.uint8))
             d_public_protected_fragment_2.append(np.frombuffer(PPF2_XOR, dtype=np.uint8))
@@ -60,10 +39,39 @@ def se_encrypt(file_path, buffer,sha_key_str, aes_key):
     np.save(f'{file_path[:file_path.rfind("/")]}/enc/{file_path.split("/")[-1]}_PPF_2.npy', np.array(d_public_protected_fragment_2))
 
 
+@time_it
+def _se_encrypt(chunk, buffer, sha_key, ll2_enc_key):
+    byte_array = np.frombuffer(chunk, dtype=np.uint8)
+    byte_array_2d = np.reshape(byte_array, (buffer, buffer))
+    
+    #Step 1, 2D DWT LVL 1
+    ll, hl, lh, hh = dwt2d(byte_array_2d)
 
+    #Step 2, 2D DWT LVL 2
+    ll2, hl2, lh2, hh2 = dwt2d(ll)
 
+    #Step 3, SHA-256 with key, on ll2, for PPF1
+    SHA256_PPF1 = sha256_with_key(sha_key, ll2.tobytes())
+    
+    #Step 4, SHA-512 with key, on (lh2, hl2, hh2), for PPF2
+    SHA512_PPF2 = sha512_with_key(sha_key, np.array([lh2,hl2,hh2]).tobytes())        
+    
+    #Step 5, PPF1 generation, XOR using generated SHA-256 from ll2
+    PPF1_bytes = np.array([hl2, lh2, hh2]).tobytes()
+    PPF1_XOR = xor_with_sha_key(PPF1_bytes, SHA256_PPF1)
+    
+    #Step 6, PPF2 generation, XOR using generated SHA-512 from (lh2, hl2, hh2)
+    PPF2_bytes = np.array([hl, lh, hh]).tobytes()
+    PPF2_XOR = xor_with_sha_key(PPF2_bytes, SHA512_PPF2)
+                
+    
+    #Step 7, Encrypt LL2 (AES 256)
+    encrypted_ll2 = aes_encrypt(ll2.tobytes(), ll2_enc_key)
 
-def se_decrypt(file_PF, file_PPF_1, file_PPF_2, buffer, output_file_path, sha_key_str, aes_key):
+    return encrypted_ll2, PPF1_XOR, PPF2_XOR
+
+@time_it
+def decrypt(file_PF, file_PPF_1, file_PPF_2, buffer, output_file_path, sha_key_str, aes_key):
     
     sha_key = sha_key_str.encode()
     ll2_enc_key = aes_key
