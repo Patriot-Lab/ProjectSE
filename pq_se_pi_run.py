@@ -1,11 +1,9 @@
 from selective_encryption import encrypt
 from utils import time_it
-from quantcrypt.kem import Kyber
+import oqs
 import os
 
-kem = Kyber()
-public_key, secret_key = kem.keygen()
-cipher_text, shared_secret = kem.encaps(public_key)
+kem = "ML-KEM-1024"
 sha_key_str = 'Tuesday Evening'
 
 buffer_sizes = list(range(128, 8193, 128))  # Buffer sizes from 128 to 8192 with an interval of 128
@@ -24,4 +22,8 @@ def process_files(folder_path, buffer_sizes, sha_key_str, shared_secret):
                         buffer=buffer_size,
                         aes_key=shared_secret)
                 
-process_files(folder_path, buffer_sizes, sha_key_str, shared_secret)
+with oqs.KeyEncapsulation(kem) as receiver:
+    with oqs.KeyEncapsulation(kem) as sender:
+        public_key_receiver = receiver.generate_keypair()
+        cipher, secret = sender.encap_secret(public_key_receiver)
+        process_files(folder_path, buffer_sizes, sha_key_str, secret)
