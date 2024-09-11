@@ -19,7 +19,6 @@ def encrypt(file_path, buffer,sha_key_str, aes_key):
             chunk = file.read(chunk_size)
 
             if not chunk:
-                # print("Reached End of the file.\n")
                 break
             print(f'itr_count: {itr_count}')
             itr_count+=1
