@@ -2,7 +2,6 @@ import numpy as np
 from numba import njit
 from utils import time_it
 
-
 @njit
 def dwt(seq):
     seq = np.copy(seq)
@@ -21,7 +20,6 @@ def dwt(seq):
     seq[(approx_len - 1) << 1] += (seq[(approx_len << 1) - 3] + seq[(detail_len << 1) - 1] + 2) >> 2
 
     return seq
-
 
 @njit
 def idwt(seq):
@@ -44,44 +42,64 @@ def idwt(seq):
 
 @time_it
 def dwt2d(seq):
-    
-    horizontal_transform = np.apply_along_axis(dwt, axis=1, arr=seq)
-    l = horizontal_transform[:,::2]
-    h = horizontal_transform[:,1::2]
-      
-    vertical_transform_l = np.apply_along_axis(dwt, axis=0, arr=l)
-    ll = np.array(vertical_transform_l[::2,:])
-    lh = np.array(vertical_transform_l[1::2,:])
- 
-    vertical_transform_h = np.apply_along_axis(dwt, axis=0, arr=h)
-    hl = np.array(vertical_transform_h[::2,:])    
-    hh = np.array(vertical_transform_h[1::2,:])
-    
-    return ll, hl, lh, hh
+    try:
+        # Horizontal transform
+        horizontal_transform = np.empty_like(seq)
+        for i in range(seq.shape[0]):
+            horizontal_transform[i] = dwt(seq[i])
+
+        # Split into approximation and detail coefficients
+        l = horizontal_transform[:, ::2]
+        h = horizontal_transform[:, 1::2]
+
+        # Vertical transform on l
+        vertical_transform_l = np.empty_like(l)
+        for i in range(l.shape[1]):
+            vertical_transform_l[:, i] = dwt(l[:, i])
+
+        ll = vertical_transform_l[::2, :]
+        lh = vertical_transform_l[1::2, :]
+
+        # Vertical transform on h
+        vertical_transform_h = np.empty_like(h)
+        for i in range(h.shape[1]):
+            vertical_transform_h[:, i] = dwt(h[:, i])
+
+        hl = vertical_transform_h[::2, :]
+        hh = vertical_transform_h[1::2, :]
+
+        return ll, hl, lh, hh
+    except Exception as e:
+        raise ValueError(f"Error during DWT2D computation: {str(e)}")
+
 
 @time_it
 def idwt2d(ll, hl, lh, hh):
-    
-    l_rows = ll.shape[0] + lh.shape[0]
-    l_cols = max(ll.shape[1], lh.shape[1])
-    vertical_transform_l = np.empty((l_rows, l_cols), dtype=ll.dtype)
-    vertical_transform_l[::2, :] = ll
-    vertical_transform_l[1::2, :] = lh
-    l = np.apply_along_axis(idwt, axis=0, arr=vertical_transform_l)    
-    
-    h_rows = hl.shape[0] + hh.shape[0]
-    h_cols = max(hl.shape[1], hh.shape[1])
-    vertical_transform_h = np.empty((h_rows, h_cols), dtype=hl.dtype)
-    vertical_transform_h[::2, :] = hl
-    vertical_transform_h[1::2, :] = hh
-    h = np.apply_along_axis(idwt, axis=0, arr=vertical_transform_h)
+    try:
+        # Combine vertical transform results for l and h
+        l = np.empty((ll.shape[0] + lh.shape[0], ll.shape[1]), dtype=ll.dtype)
+        l[::2, :] = ll
+        l[1::2, :] = lh
 
-    seq_rows = max(l.shape[0], h.shape[0])
-    seq_cols = l.shape[1]+h.shape[1]
-    horizontal_transform = np.empty((seq_rows, seq_cols), dtype=l.dtype)
-    horizontal_transform[:, ::2] = l
-    horizontal_transform[:, 1::2] = h
-    seq = np.apply_along_axis(idwt, axis=1, arr=horizontal_transform)
-    
-    return seq
-        
+        h = np.empty((hl.shape[0] + hh.shape[0], hl.shape[1]), dtype=hl.dtype)
+        h[::2, :] = hl
+        h[1::2, :] = hh
+
+        # Perform vertical inverse DWT
+        for i in range(l.shape[1]):
+            l[:, i] = idwt(l[:, i])
+
+        for i in range(h.shape[1]):
+            h[:, i] = idwt(h[:, i])
+
+        # Horizontal inverse DWT
+        seq = np.empty((l.shape[0], l.shape[1] + h.shape[1]), dtype=l.dtype)
+        seq[:, ::2] = l
+        seq[:, 1::2] = h
+
+        for i in range(seq.shape[0]):
+            seq[i] = idwt(seq[i])
+
+        return seq
+    except Exception as e:
+        raise ValueError(f"Error during IDWT2D computation: {str(e)}")
