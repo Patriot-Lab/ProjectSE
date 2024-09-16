@@ -1,50 +1,40 @@
 import os
-import base64
 from Crypto.Cipher import AES
+from Crypto.Util.Padding import pad
 from Crypto.Random import get_random_bytes
 from utils import time_it
-from selective_encryption import _se_encrypt
-import oqs
-
-KEY_SIZE = 32
-BLOCK_SIZE = AES.block_size
-BUFFER_SIZE = 3200
 
 @time_it
-def aes_encrypt(message, key, iv):
+def encrypt_file(file_path, output_folder, key):
+    with open(file_path, 'rb') as f:
+        file_data = f.read()
+
+    iv = get_random_bytes(16)
+
     cipher = AES.new(key, AES.MODE_CBC, iv)
-    
-    padded_message = message + (BLOCK_SIZE - len(message) % BLOCK_SIZE) * b' '
-    
-    ciphertext = cipher.encrypt(padded_message)
-    
-    return base64.b64encode(iv + ciphertext)
 
+    encrypted_data = cipher.encrypt(pad(file_data, AES.block_size))
 
-def encrypt_file(input_file, key):
-    iv = get_random_bytes(BLOCK_SIZE)
-    
-    with open(input_file, 'rb') as f_in:
-        chunk = f_in.read(BUFFER_SIZE*BUFFER_SIZE)
-        
-        if len(chunk) < BUFFER_SIZE:
-            chunk = f_in.read()
-    
-        aes_encrypt(chunk, key, iv)
-    
-        _se_encrypt(chunk=chunk, buffer=BUFFER_SIZE, sha_key='Tuesday Evening'.encode(), ll2_enc_key=key)
+    file_name = os.path.basename(file_path)
+    output_path = os.path.join(output_folder, file_name + ".enc")
 
-        _se_encrypt(chunk=f_in.read(BUFFER_SIZE*BUFFER_SIZE), buffer=BUFFER_SIZE, sha_key='Tuesday Evening'.encode(), ll2_enc_key=key)
+    with open(output_path, 'wb') as f_enc:
+        f_enc.write(iv + encrypted_data)
 
-        _se_encrypt(chunk=f_in.read(BUFFER_SIZE*BUFFER_SIZE), buffer=BUFFER_SIZE, sha_key='Tuesday Evening'.encode(), ll2_enc_key=key)
+def encrypt_folder(source_folder, output_folder, key):
+    if not os.path.exists(output_folder):
+        os.makedirs(output_folder)
 
+    for root, dirs, files in os.walk(source_folder):
+        for file in files:
+            file_path = os.path.join(root, file)
+            encrypt_file(file_path, output_folder, key)
+            print(f"Encrypted {file_path} and saved to {output_folder}")
 
-input_file = 'images/64MB_image.png'
-output_file = 'images/enc/4MB_image.png.enc'
+source_folder = 'images'
+output_folder = 'images/enc_aes_256'
 
-kem = "ML-KEM-1024"
-with oqs.KeyEncapsulation(kem) as receiver:
-    with oqs.KeyEncapsulation(kem) as sender:
-        public_key_receiver = receiver.generate_keypair()
-        cipher, secret = sender.encap_secret(public_key_receiver)
-        encrypt_file(input_file, secret)
+key = get_random_bytes(32)
+
+print(f"Generated AES-256 key: {key.hex()}")
+encrypt_folder(source_folder, output_folder, key)
