@@ -2,6 +2,7 @@ import numpy as np
 from numba import njit, prange
 from utils import time_it
 
+@time_it
 @njit(parallel=True)
 def dwt2d(seq):
     nrows, ncols = seq.shape
@@ -75,7 +76,7 @@ def dwt2d(seq):
 
     return ll, hl, lh, hh
 
-
+@time_it
 @njit(parallel=True)
 def idwt2d(ll, hl, lh, hh):
     nrows, ncols = ll.shape[0] * 2, ll.shape[1]

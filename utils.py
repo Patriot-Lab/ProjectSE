@@ -6,13 +6,6 @@ from Crypto.Random import get_random_bytes
 import time
 from numba import njit
 
-def bytes_to_bits(b):
-    return ''.join([bin(byte)[2:].zfill(8) for byte in bytearray(b)])
-
-
-def bits_to_bytes_v2(b, chunk_size=8):
-    return bytes([int(''.join(b[i:i+chunk_size]), 2) for i in range(0, len(b), chunk_size)])
-
 def time_it(func):
     def wrapper(*args, **kwargs):
         start_time = time.perf_counter()
@@ -22,14 +15,24 @@ def time_it(func):
         return result
     return wrapper
 
+@time_it
+def bytes_to_bits(b):
+    return ''.join([bin(byte)[2:].zfill(8) for byte in bytearray(b)])
 
+@time_it
+def bits_to_bytes_v2(b, chunk_size=8):
+    return bytes([int(''.join(b[i:i+chunk_size]), 2) for i in range(0, len(b), chunk_size)])
+
+
+
+@time_it
 def sha256_with_key(key, data):
     combined = key + data
     sha256_obj = hashlib.sha256()
     sha256_obj.update(combined)
     return sha256_obj.hexdigest()
 
-
+@time_it
 def sha512_with_key(key, data):
     combined = key + data
     sha512_obj = hashlib.sha512()
@@ -53,6 +56,7 @@ def sha512_with_key(key, data):
 import numpy as np
 from numba import njit
 
+@time_it
 @njit
 def xor_with_sha_key_numba(data_array, sha_array):
     data_length = len(data_array)
@@ -69,7 +73,7 @@ def xor_with_sha_key_numba(data_array, sha_array):
     
     return xor_result
 
-
+@time_it
 def xor_with_sha_key(data, sha_hex):
     # Convert hex string to bytes and then to NumPy array
     sha_bytes = np.frombuffer(bytes.fromhex(sha_hex), dtype=np.uint8)
@@ -83,21 +87,14 @@ def xor_with_sha_key(data, sha_hex):
     # Convert the result back to bytes
     return xor_result.tobytes()
 
-
-
-def recover_data_from_xor(xor_data, sha_hex):
-    sha_bytes = bytes.fromhex(sha_hex)
-    recovered_data = bytes([b ^ sha_bytes[i] for i, b in enumerate(xor_data)])
-    return recovered_data
-
-
+@time_it
 def aes_encrypt(data, key):
     iv = get_random_bytes(16)
     cipher = AES.new(key, AES.MODE_CBC, iv)
     encrypted_data = cipher.encrypt(pad(data, AES.block_size))
     return iv + encrypted_data
 
-
+@time_it
 def aes_decrypt(encrypted_data, key):
     iv = encrypted_data[:16]
     encrypted_data = encrypted_data[16:]

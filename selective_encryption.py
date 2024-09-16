@@ -38,11 +38,14 @@ def encrypt(file_path, buffer,sha_key_str, aes_key, save_data):
             np.save(f'{file_path[:file_path.rfind("/")]}/enc/{file_path.split("/")[-1]}_PPF_1.npy', np.array(d_public_protected_fragment_1))
             np.save(f'{file_path[:file_path.rfind("/")]}/enc/{file_path.split("/")[-1]}_PPF_2.npy', np.array(d_public_protected_fragment_2))
 
+@time_it
+def _get_2d_array(chunk, buffer):
+    return np.reshape(np.frombuffer(chunk, dtype=np.uint8), (buffer, buffer))
 
 @time_it
 def _se_encrypt(chunk, buffer, sha_key, ll2_enc_key):
-    byte_array = np.frombuffer(chunk, dtype=np.uint8)
-    byte_array_2d = np.reshape(byte_array, (buffer, buffer))
+    # byte_array = np.frombuffer(chunk, dtype=np.uint8)
+    byte_array_2d = _get_2d_array(chunk=chunk, buffer=buffer)
     
     #Step 1, 2D DWT LVL 1
     ll, hl, lh, hh = dwt2d(byte_array_2d)
