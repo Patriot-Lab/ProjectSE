@@ -4,7 +4,7 @@ from dwt import dwt2d, idwt2d
 from utils import aes_encrypt, aes_decrypt, sha256_with_key, sha512_with_key, xor_with_sha_key, time_it
 
 @time_it
-def encrypt(file_path, buffer,sha_key_str, aes_key):    
+def encrypt(file_path, buffer,sha_key_str, aes_key, save_data):    
     chunk_size = buffer * buffer
     sha_key = sha_key_str.encode()
     ll2_enc_key = aes_key
@@ -33,9 +33,10 @@ def encrypt(file_path, buffer,sha_key_str, aes_key):
             d_public_protected_fragment_1.append(np.frombuffer(PPF1_XOR, dtype=np.uint8))
             d_public_protected_fragment_2.append(np.frombuffer(PPF2_XOR, dtype=np.uint8))
     
-    np.save(f'{file_path[:file_path.rfind("/")]}/enc/{file_path.split("/")[-1]}_PF.npy', np.array(d_private_fragment))
-    np.save(f'{file_path[:file_path.rfind("/")]}/enc/{file_path.split("/")[-1]}_PPF_1.npy', np.array(d_public_protected_fragment_1))
-    np.save(f'{file_path[:file_path.rfind("/")]}/enc/{file_path.split("/")[-1]}_PPF_2.npy', np.array(d_public_protected_fragment_2))
+    if(save_data):
+            np.save(f'{file_path[:file_path.rfind("/")]}/enc/{file_path.split("/")[-1]}_PF.npy', np.array(d_private_fragment))
+            np.save(f'{file_path[:file_path.rfind("/")]}/enc/{file_path.split("/")[-1]}_PPF_1.npy', np.array(d_public_protected_fragment_1))
+            np.save(f'{file_path[:file_path.rfind("/")]}/enc/{file_path.split("/")[-1]}_PPF_2.npy', np.array(d_public_protected_fragment_2))
 
 
 @time_it

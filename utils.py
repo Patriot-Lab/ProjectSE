@@ -22,14 +22,14 @@ def time_it(func):
         return result
     return wrapper
 
-@time_it
+
 def sha256_with_key(key, data):
     combined = key + data
     sha256_obj = hashlib.sha256()
     sha256_obj.update(combined)
     return sha256_obj.hexdigest()
 
-@time_it
+
 def sha512_with_key(key, data):
     combined = key + data
     sha512_obj = hashlib.sha512()
@@ -69,7 +69,7 @@ def xor_with_sha_key_numba(data_array, sha_array):
     
     return xor_result
 
-@time_it
+
 def xor_with_sha_key(data, sha_hex):
     # Convert hex string to bytes and then to NumPy array
     sha_bytes = np.frombuffer(bytes.fromhex(sha_hex), dtype=np.uint8)
@@ -84,20 +84,20 @@ def xor_with_sha_key(data, sha_hex):
     return xor_result.tobytes()
 
 
-@time_it
+
 def recover_data_from_xor(xor_data, sha_hex):
     sha_bytes = bytes.fromhex(sha_hex)
     recovered_data = bytes([b ^ sha_bytes[i] for i, b in enumerate(xor_data)])
     return recovered_data
 
-@time_it
+
 def aes_encrypt(data, key):
     iv = get_random_bytes(16)
     cipher = AES.new(key, AES.MODE_CBC, iv)
     encrypted_data = cipher.encrypt(pad(data, AES.block_size))
     return iv + encrypted_data
 
-@time_it
+
 def aes_decrypt(encrypted_data, key):
     iv = encrypted_data[:16]
     encrypted_data = encrypted_data[16:]

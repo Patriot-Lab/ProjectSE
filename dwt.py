@@ -1,105 +1,150 @@
 import numpy as np
-from numba import njit
+from numba import njit, prange
 from utils import time_it
 
-@njit
-def dwt(seq):
-    seq = np.copy(seq)
-    n = seq.shape[0]
-
-    detail_len = n >> 1
-    approx_len = n - detail_len
-
-    for i in range(1, detail_len):
-        seq[(i << 1) - 1] -= (seq[(i - 1) << 1] + seq[i << 1]) >> 1
-    seq[(detail_len << 1) - 1] -= (seq[(detail_len - 1) << 1] + seq[(approx_len - 1) << 1]) >> 1
-
-    seq[0] += (seq[1] + seq[1] + 2) >> 2
-    for i in range(1, approx_len - 1):
-        seq[i << 1] += (seq[(i << 1) - 1] + seq[(i << 1) + 1] + 2) >> 2
-    seq[(approx_len - 1) << 1] += (seq[(approx_len << 1) - 3] + seq[(detail_len << 1) - 1] + 2) >> 2
-
-    return seq
-
-@njit
-def idwt(seq):
-    seq = np.copy(seq)
-    n = seq.shape[0]
-
-    detail_len = n >> 1
-    approx_len = n - detail_len
-    
-    seq[0] -= (seq[1] + seq[1] + 2) >> 2
-    for i in range(1, approx_len - 1):
-        seq[i << 1] -= (seq[(i << 1) - 1] + seq[(i << 1) + 1] + 2) >> 2
-    seq[(approx_len - 1) << 1] -= (seq[(approx_len << 1) - 3] + seq[(detail_len << 1) - 1] + 2) >> 2
-
-    for i in range(1, detail_len):
-        seq[(i << 1) - 1] += (seq[(i - 1) << 1] + seq[i << 1]) >> 1
-    seq[(detail_len << 1) - 1] += (seq[(detail_len - 1) << 1] + seq[(approx_len - 1) << 1]) >> 1
-
-    return seq
-
-@time_it
+@njit(parallel=True)
 def dwt2d(seq):
-    try:
-        # Horizontal transform
-        horizontal_transform = np.empty_like(seq)
-        for i in range(seq.shape[0]):
-            horizontal_transform[i] = dwt(seq[i])
+    nrows, ncols = seq.shape
 
-        # Split into approximation and detail coefficients
-        l = horizontal_transform[:, ::2]
-        h = horizontal_transform[:, 1::2]
+    # Horizontal transform
+    horizontal_transform = np.empty_like(seq)
+    for i in prange(nrows):  # Parallelizing over rows
+        seq_row = np.copy(seq[i])
+        detail_len = ncols >> 1
+        approx_len = ncols - detail_len
 
-        # Vertical transform on l
-        vertical_transform_l = np.empty_like(l)
-        for i in range(l.shape[1]):
-            vertical_transform_l[:, i] = dwt(l[:, i])
+        # Perform 1D DWT on the row
+        for j in range(1, detail_len):
+            seq_row[(j << 1) - 1] -= (seq_row[(j - 1) << 1] + seq_row[j << 1]) >> 1
+        seq_row[(detail_len << 1) - 1] -= (seq_row[(detail_len - 1) << 1] + seq_row[(approx_len - 1) << 1]) >> 1
 
-        ll = vertical_transform_l[::2, :]
-        lh = vertical_transform_l[1::2, :]
+        seq_row[0] += (seq_row[1] + seq_row[1] + 2) >> 2
+        for j in range(1, approx_len - 1):
+            seq_row[j << 1] += (seq_row[(j << 1) - 1] + seq_row[(j << 1) + 1] + 2) >> 2
+        seq_row[(approx_len - 1) << 1] += (seq_row[(approx_len << 1) - 3] + seq_row[(detail_len << 1) - 1] + 2) >> 2
 
-        # Vertical transform on h
-        vertical_transform_h = np.empty_like(h)
-        for i in range(h.shape[1]):
-            vertical_transform_h[:, i] = dwt(h[:, i])
+        horizontal_transform[i] = seq_row
 
-        hl = vertical_transform_h[::2, :]
-        hh = vertical_transform_h[1::2, :]
+    # Split into approximation and detail coefficients
+    l = horizontal_transform[:, ::2]
+    h = horizontal_transform[:, 1::2]
 
-        return ll, hl, lh, hh
-    except Exception as e:
-        raise ValueError(f"Error during DWT2D computation: {str(e)}")
+    # Vertical transform on l
+    vertical_transform_l = np.empty_like(l)
+    for i in prange(l.shape[1]):  # Parallelizing over columns
+        seq_col = np.copy(l[:, i])
+        detail_len = nrows >> 1
+        approx_len = nrows - detail_len
+
+        # Perform 1D DWT on the column
+        for j in range(1, detail_len):
+            seq_col[(j << 1) - 1] -= (seq_col[(j - 1) << 1] + seq_col[j << 1]) >> 1
+        seq_col[(detail_len << 1) - 1] -= (seq_col[(detail_len - 1) << 1] + seq_col[(approx_len - 1) << 1]) >> 1
+
+        seq_col[0] += (seq_col[1] + seq_col[1] + 2) >> 2
+        for j in range(1, approx_len - 1):
+            seq_col[j << 1] += (seq_col[(j << 1) - 1] + seq_col[(j << 1) + 1] + 2) >> 2
+        seq_col[(approx_len - 1) << 1] += (seq_col[(approx_len << 1) - 3] + seq_col[(detail_len << 1) - 1] + 2) >> 2
+
+        vertical_transform_l[:, i] = seq_col
+
+    ll = vertical_transform_l[::2, :]
+    lh = vertical_transform_l[1::2, :]
+
+    # Vertical transform on h
+    vertical_transform_h = np.empty_like(h)
+    for i in prange(h.shape[1]):  # Parallelizing over columns
+        seq_col = np.copy(h[:, i])
+        detail_len = nrows >> 1
+        approx_len = nrows - detail_len
+
+        # Perform 1D DWT on the column
+        for j in range(1, detail_len):
+            seq_col[(j << 1) - 1] -= (seq_col[(j - 1) << 1] + seq_col[j << 1]) >> 1
+        seq_col[(detail_len << 1) - 1] -= (seq_col[(detail_len - 1) << 1] + seq_col[(approx_len - 1) << 1]) >> 1
+
+        seq_col[0] += (seq_col[1] + seq_col[1] + 2) >> 2
+        for j in range(1, approx_len - 1):
+            seq_col[j << 1] += (seq_col[(j << 1) - 1] + seq_col[(j << 1) + 1] + 2) >> 2
+        seq_col[(approx_len - 1) << 1] += (seq_col[(approx_len << 1) - 3] + seq_col[(detail_len << 1) - 1] + 2) >> 2
+
+        vertical_transform_h[:, i] = seq_col
+
+    hl = vertical_transform_h[::2, :]
+    hh = vertical_transform_h[1::2, :]
+
+    return ll, hl, lh, hh
 
 
-@time_it
+@njit(parallel=True)
 def idwt2d(ll, hl, lh, hh):
-    try:
-        # Combine vertical transform results for l and h
-        l = np.empty((ll.shape[0] + lh.shape[0], ll.shape[1]), dtype=ll.dtype)
-        l[::2, :] = ll
-        l[1::2, :] = lh
+    nrows, ncols = ll.shape[0] * 2, ll.shape[1]
 
-        h = np.empty((hl.shape[0] + hh.shape[0], hl.shape[1]), dtype=hl.dtype)
-        h[::2, :] = hl
-        h[1::2, :] = hh
+    # Combine vertical transform results for l and h
+    l = np.empty((nrows, ncols), dtype=ll.dtype)
+    l[::2, :] = ll
+    l[1::2, :] = lh
 
-        # Perform vertical inverse DWT
-        for i in range(l.shape[1]):
-            l[:, i] = idwt(l[:, i])
+    h = np.empty((nrows, ncols), dtype=hl.dtype)
+    h[::2, :] = hl
+    h[1::2, :] = hh
 
-        for i in range(h.shape[1]):
-            h[:, i] = idwt(h[:, i])
+    # Perform vertical inverse DWT
+    for i in prange(ncols):  # Parallelizing over columns
+        seq_col = np.copy(l[:, i])
+        detail_len = nrows >> 1
+        approx_len = nrows - detail_len
 
-        # Horizontal inverse DWT
-        seq = np.empty((l.shape[0], l.shape[1] + h.shape[1]), dtype=l.dtype)
-        seq[:, ::2] = l
-        seq[:, 1::2] = h
+        # Perform 1D IDWT on the column
+        seq_col[0] -= (seq_col[1] + seq_col[1] + 2) >> 2
+        for j in range(1, approx_len - 1):
+            seq_col[j << 1] -= (seq_col[(j << 1) - 1] + seq_col[(j << 1) + 1] + 2) >> 2
+        seq_col[(approx_len - 1) << 1] -= (seq_col[(approx_len << 1) - 3] + seq_col[(detail_len << 1) - 1] + 2) >> 2
 
-        for i in range(seq.shape[0]):
-            seq[i] = idwt(seq[i])
+        for j in range(1, detail_len):
+            seq_col[(j << 1) - 1] += (seq_col[(j - 1) << 1] + seq_col[j << 1]) >> 1
+        seq_col[(detail_len << 1) - 1] += (seq_col[(detail_len - 1) << 1] + seq_col[(approx_len - 1) << 1]) >> 1
 
-        return seq
-    except Exception as e:
-        raise ValueError(f"Error during IDWT2D computation: {str(e)}")
+        l[:, i] = seq_col
+
+    # Perform vertical inverse DWT on h
+    for i in prange(ncols):  # Parallelizing over columns
+        seq_col = np.copy(h[:, i])
+        detail_len = nrows >> 1
+        approx_len = nrows - detail_len
+
+        # Perform 1D IDWT on the column
+        seq_col[0] -= (seq_col[1] + seq_col[1] + 2) >> 2
+        for j in range(1, approx_len - 1):
+            seq_col[j << 1] -= (seq_col[(j << 1) - 1] + seq_col[(j << 1) + 1] + 2) >> 2
+        seq_col[(approx_len - 1) << 1] -= (seq_col[(approx_len << 1) - 3] + seq_col[(detail_len << 1) - 1] + 2) >> 2
+
+        for j in range(1, detail_len):
+            seq_col[(j << 1) - 1] += (seq_col[(j - 1) << 1] + seq_col[j << 1]) >> 1
+        seq_col[(detail_len << 1) - 1] += (seq_col[(detail_len - 1) << 1] + seq_col[(approx_len - 1) << 1]) >> 1
+
+        h[:, i] = seq_col
+
+    # Horizontal inverse DWT
+    seq = np.empty((nrows, ncols * 2), dtype=l.dtype)
+    seq[:, ::2] = l
+    seq[:, 1::2] = h
+
+    for i in prange(nrows):  # Parallelizing over rows
+        seq_row = np.copy(seq[i])
+        detail_len = ncols
+        approx_len = ncols * 2 - detail_len
+
+        # Perform 1D IDWT on the row
+        seq_row[0] -= (seq_row[1] + seq_row[1] + 2) >> 2
+        for j in range(1, approx_len - 1):
+            seq_row[j << 1] -= (seq_row[(j << 1) - 1] + seq_row[(j << 1) + 1] + 2) >> 2
+        seq_row[(approx_len - 1) << 1] -= (seq_row[(approx_len << 1) - 3] + seq_row[(detail_len << 1) - 1] + 2) >> 2
+
+        for j in range(1, detail_len):
+            seq_row[(j << 1) - 1] += (seq_row[(j - 1) << 1] + seq_row[j << 1]) >> 1
+        seq_row[(detail_len << 1) - 1] += (seq_row[(detail_len - 1) << 1] + seq_row[(approx_len - 1) << 1]) >> 1
+
+        seq[i] = seq_row
+
+    return seq

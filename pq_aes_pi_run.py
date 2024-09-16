@@ -11,7 +11,7 @@ BLOCK_SIZE = AES.block_size
 BUFFER_SIZE = 3200
 
 @time_it
-def encrypt_message(message, key, iv):
+def aes_encrypt(message, key, iv):
     cipher = AES.new(key, AES.MODE_CBC, iv)
     
     padded_message = message + (BLOCK_SIZE - len(message) % BLOCK_SIZE) * b' '
@@ -21,7 +21,7 @@ def encrypt_message(message, key, iv):
     return base64.b64encode(iv + ciphertext)
 
 
-def encrypt_file(input_file, output_file, key):
+def encrypt_file(input_file, key):
     iv = get_random_bytes(BLOCK_SIZE)
     
     with open(input_file, 'rb') as f_in:
@@ -30,15 +30,16 @@ def encrypt_file(input_file, output_file, key):
         if len(chunk) < BUFFER_SIZE:
             chunk = f_in.read()
     
-    encrypted_data = encrypt_message(chunk, key, iv)
+        aes_encrypt(chunk, key, iv)
     
-    _se_encrypt(chunk=chunk, buffer=BUFFER_SIZE, sha_key='Tuesday Evening'.encode(), ll2_enc_key=key)
-    
-    with open(output_file, 'wb') as f_out:
-        f_out.write(encrypted_data)
+        _se_encrypt(chunk=chunk, buffer=BUFFER_SIZE, sha_key='Tuesday Evening'.encode(), ll2_enc_key=key)
+
+        _se_encrypt(chunk=f_in.read(BUFFER_SIZE*BUFFER_SIZE), buffer=BUFFER_SIZE, sha_key='Tuesday Evening'.encode(), ll2_enc_key=key)
+
+        _se_encrypt(chunk=f_in.read(BUFFER_SIZE*BUFFER_SIZE), buffer=BUFFER_SIZE, sha_key='Tuesday Evening'.encode(), ll2_enc_key=key)
 
 
-input_file = 'images/4MB_image.png'
+input_file = 'images/64MB_image.png'
 output_file = 'images/enc/4MB_image.png.enc'
 
 kem = "ML-KEM-1024"
@@ -46,5 +47,4 @@ with oqs.KeyEncapsulation(kem) as receiver:
     with oqs.KeyEncapsulation(kem) as sender:
         public_key_receiver = receiver.generate_keypair()
         cipher, secret = sender.encap_secret(public_key_receiver)
-        encrypt_file(input_file, output_file, secret)
-        print(f"Encrypted {input_file} -> {output_file}")
+        encrypt_file(input_file, secret)
