@@ -25,11 +25,13 @@ def encrypt_folder(source_folder, output_folder, key):
     if not os.path.exists(output_folder):
         os.makedirs(output_folder)
 
-    for root, dirs, files in os.walk(source_folder):
-        for file in files:
-            file_path = os.path.join(root, file)
-            encrypt_file(file_path, output_folder, key)
-            print(f"Encrypted {file_path} and saved to {output_folder}")
+    files = [file for file in os.listdir(source_folder) if os.path.isfile(os.path.join(source_folder, file))]
+
+    for file in files:
+        file_path = os.path.join(source_folder, file)
+        encrypt_file(file_path, output_folder, key)
+        print(f"Encrypted {file_path} and saved to {output_folder}")
+
 
 source_folder = 'images'
 output_folder = 'images/enc_aes_256'
