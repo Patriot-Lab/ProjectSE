@@ -1,0 +1,40 @@
+Generated AES-256 key: 235106e3321e6ac102b55452bb433103d282e4c7a96215eb74dfb297108aa10b
+images/4MB_image.png
+encrypt_data: 0.093830069
+write_data: 0.184541627
+encrypt_file: 0.376836832
+
+images/128MB_image.png
+encrypt_data: 2.663539236
+write_data: 7.617228746
+encrypt_file: 10.667111608
+
+images/16MB_image.png
+encrypt_data: 0.330084022
+write_data: 1.505929983
+encrypt_file: 1.890545231
+
+images/32MB_image.png
+encrypt_data: 0.673884913
+write_data: 1.100619545
+encrypt_file: 4.133811168
+
+images/64MB_image.png
+encrypt_data: 1.341884031
+write_data: 1.893942454
+encrypt_file: 8.332348893
+
+images/8MB_image.png
+encrypt_data: 0.158360699
+write_data: 0.330151768
+encrypt_file: 1.514396614
+
+images/2MB_image.png
+encrypt_data: 0.042093455
+write_data: 0.079721971
+encrypt_file: 0.128025211
+
+images/256MB_image.png
+encrypt_data: 5.351067827
+write_data: 10.229898183
+encrypt_file: 16.326893252
